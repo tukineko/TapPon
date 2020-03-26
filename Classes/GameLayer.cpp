@@ -2,8 +2,6 @@
 #include "GameLayer.h"
 #include "SimpleAudioEngine.h"
 
-#define PI 3.14159265358979323846
-
 USING_NS_CC;
 
 Scene* GameLayer::createScene()
@@ -22,11 +20,26 @@ bool GameLayer::init()
     }
     CCLOG("----------------GameLayer::init()----------------");
 
+    //音データのプレロード
+    CocosDenshion::SimpleAudioEngine::getInstance()->preloadEffect("se/flee1.mp3");
+
+    //スコア画像はBatchNodeで処理
+    _scoreBatchNode = SpriteBatchNode::create("game/number.png");
+    this->addChild(_scoreBatchNode);
+
+    //初期値
+    _game_state = GameState::PLAYING;
     
     //背景
     auto bg = Sprite::create("game/bg.png");
     bg->setPosition(Vec2(winSizeCenterW, winSizeCenterH));
     this->addChild(bg, (int)mainZOderList::BG);
+
+    //ライフの表示
+    this->ViewLife();
+
+    //スコアの表示
+    this->ViewScore();
 
     //雲手前
     _cloud_front1 = Sprite::create("game/cloud_front.png");
@@ -73,15 +86,19 @@ bool GameLayer::init()
 
     //自機タル
     _boxStart = Sprite::create("game/box.png");
-    _boxStart->setPosition(Vec2(300, winSizeCenterH));
+    _boxStart->setPosition(Vec2(BOX_START_POS_X, BOX_START_POS_Y));
     this->addChild(_boxStart, (int)mainZOderList::BOX);
 
     //ゴールタル
     _boxEnd = Sprite::create("game/box.png");
-    _boxEnd->setPosition(Vec2(1100, winSizeCenterH));
+    _boxEnd->setPosition(Vec2(BOX_END_POS_X, BOX_END_POS_Y));
+    _boxEnd->setRotation(180);
     this->addChild(_boxEnd, (int)mainZOderList::BOX);
 
-    _game_state = GameState::PLAYING;
+    auto sp = NextBox::create();
+    sp->setPosition(Vec2(winSizeCenterW, winSizeCenterH));
+    sp->setStageType(1);
+    this->addChild(sp, (int)mainZOderList::BOX, "test");
 
     this->scheduleUpdate();
 
@@ -159,18 +176,54 @@ void GameLayer::CloudAnime() {
 }
 
 bool GameLayer::onTouchBegan(cocos2d::Touch* touch, cocos2d::Event* event) {
+    Vec2 location = touch->getLocation();
 
-    if (_game_state == GameState::PLAYING) {
+    auto node = this->getChildByName("test");
+    auto sp = dynamic_cast<NextBox*>(node);
+    sp->CheckHitArea(location);
+    
+
+    /*if (_game_state == GameState::PLAYING) {
         this->TapAction();
-    }
+    }*/
 
     return true;
 }
 
-void GameLayer::TapAction() {
-    
+void GameLayer::ViewLife() {
+    for (int i = 0; i < _lifeNum; i++) {
+        auto sp = Sprite::create("game/life.png");
+        sp->setPosition(Vec2(70 + (i * 120), winSizeH - 70));
+        this->addChild(sp, (int)mainZOderList::MENU, "life" + std::to_string(i + 1));
+    }
+}
+
+void GameLayer::ViewScore() {
+    //scoreの名前がついているノードをすべて削除
+    this->enumerateChildren("score", [](Node* node) -> bool {
+        auto action = RemoveSelf::create();
+        node->runAction(action);
+        return false;
+    });
+
+    auto score = std::to_string(_score);
+    int lang = score.length();
+    int numberRect = 64;
+
+    for (int i = 0; i < lang; i++) {
+        auto number = Sprite::createWithTexture(_scoreBatchNode->getTexture(), Rect(0, 0, numberRect, numberRect));
+        number->setPosition(Vec2((winSizeCenterW + 50) + numberRect * i, winSizeH - 50));
+        char c = score[i];
+        int num = c - '0';
+        number->setTextureRect(Rect(numberRect * num, 0, numberRect, numberRect));
+        this->addChild(number, (int)mainZOderList::MENU, "score");
+    }
+}
+
+void GameLayer::TapAction() {    
     _game_state = GameState::CHECK;
     
+    //ボヨヨン
     _boxStart->runAction(
         Sequence::create(
             ScaleTo::create(0.05f, this->getScaleX(), 0.5f),
@@ -179,28 +232,139 @@ void GameLayer::TapAction() {
         )
     );
 
+    //キャラクター射出
     _chara = Sprite::create("game/chara.png");
     _chara->setPosition(_boxStart->getPosition());
     this->addChild(_chara, (int)mainZOderList::CHARA);
-    _chara->runAction(
-        Sequence::create(
-            MoveBy::create(0.5f, Vec2(winSizeW, 0)),
-            //RemoveSelf::create(),
-            nullptr
-        )
-    );
+    _chara->runAction(MoveBy::create(0.5f, Vec2(winSizeW, 0)));
 
 }
 
 void GameLayer::CheckChara() {
-    auto rect = _chara->boundingBox();
-    auto rect2 = Rect(winSizeW, 0, 10, winSizeH);
-
-    if (rect.intersectsRect(rect2) ){
-
-        //trueの場合に、何かしらの処理を行う
-        CCLOG("hit");
+    auto chara_rect = _chara->getBoundingBox();
+    auto charaPos = _chara->getPosition();
+    
+    //右壁との衝突
+    auto righe_rect = Rect(winSizeW + 210, 0, 10, winSizeH);
+    if (chara_rect.intersectsRect(righe_rect)){
+        this->MissAnime();
     }
+
+    //タルとの衝突
+    auto box_rect = _boxEnd->getBoundingBox();
+    auto box_point = _boxEnd->getPosition();
+    if (box_rect.containsPoint(charaPos)) {
+        this->ClearAnime();
+    }
+}
+
+void GameLayer::ClearAnime() {
+    _game_state = GameState::CLEAR;
+
+    _score++;
+    this->ViewScore();
+
+    //_chara->stopAllActions();
+    _chara->removeFromParent();
+
+    _boxEnd->runAction(
+        Sequence::create(
+            ScaleTo::create(0.05f, 0.5f, this->getScaleY()),
+            EaseElasticOut::create(ScaleTo::create(0.5f, 1.0f, this->getScaleY())),
+            CallFunc::create([=]() {
+                this->NextStage();
+            }),
+            nullptr
+        )
+    );
+}
+
+void GameLayer::MissAnime() {
+    _game_state = GameState::MISS;
+    _chara->removeFromParent();
+
+    //失敗時のSE
+    CocosDenshion::SimpleAudioEngine::getInstance()->playEffect("se/flee1.mp3");
+
+    //ライフのアニメーション
+    auto tag_name = "life" + std::to_string(_lifeNum);
+    auto life = this->getChildByName(tag_name);
+    life->runAction(
+        Sequence::create(
+            Spawn::create(
+                MoveBy::create(0.2f, Vec2(0, 5)),
+                FadeOut::create(0.2f),
+                nullptr
+            ),
+            CallFunc::create([=]() {
+                _lifeNum--;
+                if (_lifeNum == 0) {
+                    this->GameOverAnime();
+                }else {
+                    _game_state = GameState::PLAYING;
+                }
+            }),
+            RemoveSelf::create(),
+            nullptr
+        )
+    );
+}
+
+void GameLayer::GameOverAnime() {
+    _game_state = GameState::GAMEOVER;
+
+    auto sp = Sprite::create("game/gameover.png");
+    sp->setPosition(Vec2(winSizeCenterW, winSizeH + 80));
+    this->addChild(sp, (int)mainZOderList::TEXT);
+
+    sp->runAction(
+        Sequence::create(
+            EaseBackOut::create(MoveTo::create(0.5f, Vec2(winSizeCenterW, winSizeCenterH))),
+            nullptr
+        )
+    );
+}
+
+void GameLayer::NextStage() {
+    _game_state = GameState::NEXT;
+
+    auto next = Sprite::create("game/box.png");
+    next->setPosition(Vec2(BOX_NEXT_POS_X, BOX_NEXT_POS_Y));
+    next->setRotation(180);
+    this->addChild(next, (int)mainZOderList::BOX);
+
+    next->runAction(
+        Sequence::create(
+            MoveTo::create(0.2f, Vec2(BOX_END_POS_X, BOX_END_POS_Y)),
+            nullptr
+        )
+    );
+
+    _boxStart->runAction(
+        Sequence::create(
+            MoveTo::create(0.2f, Vec2(-110, winSizeCenterH)),
+            RemoveSelf::create(),
+            nullptr
+        )
+    );
+
+    _boxEnd->runAction(
+        Sequence::create(
+            Spawn::create(
+                MoveTo::create(0.2f, Vec2(BOX_START_POS_X, BOX_START_POS_Y)),
+                RotateTo::create(0.2f, 0),
+                nullptr
+            ),
+            CallFunc::create([=]() {
+                _boxStart = _boxEnd;
+                _boxEnd = next;
+                _boxEndTime = 0;
+                _game_state = GameState::PLAYING;
+            }),
+            nullptr
+        )
+    );
+
 }
 
 void GameLayer::nextSceneCallback() {

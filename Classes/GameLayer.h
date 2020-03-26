@@ -2,6 +2,7 @@
 #define __GameLayer_H__
 
 #include "Config.h"
+#include "NextBox.h"
 
 USING_NS_CC;
 
@@ -15,18 +16,22 @@ private:
         CHARA,
         BOX,
         CLOUD_FRONT,
-        MAME,
-        TITLE,
-        SCORE,
-        MENU
+        MENU,
+        TEXT
     };
 
     enum class GameState {
         DEFAULT = 0,
         PLAYING,
         CHECK,
+        CLEAR,
+        NEXT,
+        MISS,
+        GAMEOVER,
         RESULT,
     };
+
+    SpriteBatchNode* _scoreBatchNode;
 
     GameState _game_state;
 
@@ -42,6 +47,8 @@ private:
     Sprite* _boxEnd;
     Sprite* _chara;
 
+    int _lifeNum = 3;
+    int _score = 0;
     float _boxEndTime = 0;
 
 
@@ -56,11 +63,29 @@ public:
     //雲のアニメーション
     void CloudAnime();
 
+    //ライフの表示
+    void ViewLife();
+
+    //スコアの表示
+    void ViewScore();
+
     //タップしたときのアクション
     void TapAction();
 
-    //キャラとの当たり判定
+    //キャラの当たり判定
     void CheckChara();
+
+    //成功したときのアニメーション
+    void ClearAnime();
+
+    //ミスしたときのアニメーション
+    void MissAnime();
+
+    //ゲームオーバー
+    void GameOverAnime();
+
+    //ネクストステージ処理
+    void NextStage();
 
     void nextSceneCallback();
 };
