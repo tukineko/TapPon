@@ -2,7 +2,7 @@
 #define __GameLayer_H__
 
 #include "Config.h"
-#include "NextBox.h"
+#include "Barrel.h"
 
 USING_NS_CC;
 
@@ -13,8 +13,8 @@ private:
         BG = 0,
         CLOUD_BACK1,
         CLOUD_BACK2,
-        CHARA,
         BOX,
+        CHARA,
         CLOUD_FRONT,
         MENU,
         TEXT
@@ -35,6 +35,7 @@ private:
 
     GameState _game_state;
 
+    //雲背景
     Sprite* _cloud_front1;
     Sprite* _cloud_front2;
     Sprite* _cloud_back1;
@@ -43,8 +44,10 @@ private:
     Sprite* _cloud_back4;
     Sprite* _cloud_back5;
     Sprite* _cloud_back6;
-    Sprite* _boxStart;
-    Sprite* _boxEnd;
+
+    //タルと飛ばだしたキャラ
+    Barrel* _boxStart;
+    Barrel* _boxEnd;
     Sprite* _chara;
 
     int _lifeNum = 3;
@@ -80,6 +83,9 @@ public:
 
     //ミスしたときのアニメーション
     void MissAnime();
+
+    //ミスしたときのアニメーション　タルとぶつかったとき
+    void MissAnime2();
 
     //ゲームオーバー
     void GameOverAnime();

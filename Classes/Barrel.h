@@ -1,18 +1,17 @@
-﻿#ifndef __NextBox_H__
-#define __NextBox_H__
+﻿#ifndef __Barrel_H__
+#define __Barrel_H__
 
 #include "Config.h"
 
 USING_NS_CC;
 
-class NextBox : public Sprite {
+class Barrel : public Sprite {
 protected:
     Sprite* _hit_area;
     Sprite* _out_box;
-    Sprite* _out_box2;
-    Sprite* _out_box3;
-
-    float _nextBoxTime = 0;
+    DrawNode* _scope;
+    
+    float _cnt = 0;
 
 public:
     enum class State {
@@ -20,10 +19,10 @@ public:
         MOVING
     };
 
-    NextBox();
-    ~NextBox();
+    Barrel();
+    ~Barrel();
     virtual bool init();
-    CREATE_FUNC(NextBox);
+    CREATE_FUNC(Barrel);
     void update(float dt);
 
     //有効な面と衝突したか
@@ -36,4 +35,4 @@ public:
     CC_SYNTHESIZE(int, _stageType, StageType);
 };
 
-#endif // __NextBox_H__
+#endif // __Barrel_H__

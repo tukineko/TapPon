@@ -10,9 +10,7 @@ class TitleLayer : public Layer
 private:
     enum class mainZOderList {
         BG = 0,
-        MAME,
         TITLE,
-        SCORE,
         MENU
     };
 

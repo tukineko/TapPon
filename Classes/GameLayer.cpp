@@ -22,6 +22,9 @@ bool GameLayer::init()
 
     //音データのプレロード
     CocosDenshion::SimpleAudioEngine::getInstance()->preloadEffect("se/flee1.mp3");
+    CocosDenshion::SimpleAudioEngine::getInstance()->preloadEffect("se/boyon1.mp3");
+    CocosDenshion::SimpleAudioEngine::getInstance()->preloadEffect("se/bomb1.mp3");
+    CocosDenshion::SimpleAudioEngine::getInstance()->preloadEffect("se/correct2.mp3");
 
     //スコア画像はBatchNodeで処理
     _scoreBatchNode = SpriteBatchNode::create("game/number.png");
@@ -85,20 +88,17 @@ bool GameLayer::init()
     this->addChild(_cloud_back6, (int)mainZOderList::CLOUD_BACK1);
 
     //自機タル
-    _boxStart = Sprite::create("game/box.png");
+    _boxStart = Barrel::create();
     _boxStart->setPosition(Vec2(BOX_START_POS_X, BOX_START_POS_Y));
+    _boxStart->setRotation(180);
+    _boxStart->setStageType(3);
     this->addChild(_boxStart, (int)mainZOderList::BOX);
 
     //ゴールタル
-    _boxEnd = Sprite::create("game/box.png");
+    _boxEnd = Barrel::create();
     _boxEnd->setPosition(Vec2(BOX_END_POS_X, BOX_END_POS_Y));
-    _boxEnd->setRotation(180);
+    _boxEnd->setStageType(2);
     this->addChild(_boxEnd, (int)mainZOderList::BOX);
-
-    auto sp = NextBox::create();
-    sp->setPosition(Vec2(winSizeCenterW, winSizeCenterH));
-    sp->setStageType(1);
-    this->addChild(sp, (int)mainZOderList::BOX, "test");
 
     this->scheduleUpdate();
 
@@ -119,9 +119,14 @@ void GameLayer::onEnterTransitionDidFinish()
 void GameLayer::update(float dt) {
     this->CloudAnime();
 
+    //プレイング以外はストップ
     if (_game_state == GameState::PLAYING) {
-        _boxEndTime += dt;
-        _boxEnd->setPositionY(_boxEnd->getPositionY() + (cos(PI * 0.5 * _boxEndTime) * 5));
+        _boxStart->setState(Barrel::State::MOVING);
+        _boxEnd->setState(Barrel::State::MOVING);
+    }
+    else {
+        _boxStart->setState(Barrel::State::STOP);
+        _boxEnd->setState(Barrel::State::STOP);
     }
 
     if (_game_state == GameState::CHECK) {
@@ -178,14 +183,9 @@ void GameLayer::CloudAnime() {
 bool GameLayer::onTouchBegan(cocos2d::Touch* touch, cocos2d::Event* event) {
     Vec2 location = touch->getLocation();
 
-    auto node = this->getChildByName("test");
-    auto sp = dynamic_cast<NextBox*>(node);
-    sp->CheckHitArea(location);
-    
-
-    /*if (_game_state == GameState::PLAYING) {
+    if (_game_state == GameState::PLAYING) {
         this->TapAction();
-    }*/
+    }
 
     return true;
 }
@@ -223,6 +223,8 @@ void GameLayer::ViewScore() {
 void GameLayer::TapAction() {    
     _game_state = GameState::CHECK;
     
+    CocosDenshion::SimpleAudioEngine::getInstance()->playEffect("se/bomb1.mp3");
+
     //ボヨヨン
     _boxStart->runAction(
         Sequence::create(
@@ -235,8 +237,15 @@ void GameLayer::TapAction() {
     //キャラクター射出
     _chara = Sprite::create("game/chara.png");
     _chara->setPosition(_boxStart->getPosition());
+    _chara->setAnchorPoint(Vec2::ANCHOR_MIDDLE_RIGHT);
+    _chara->setRotation(_boxStart->getRotation() - 180);
     this->addChild(_chara, (int)mainZOderList::CHARA);
-    _chara->runAction(MoveBy::create(0.5f, Vec2(winSizeW, 0)));
+    
+    auto r = CC_DEGREES_TO_RADIANS(_boxStart->getRotation());
+    auto x = -winSizeW * cos(r);
+    auto y = winSizeW * sin(r);
+    CCLOG("%f, %f", x, y);
+    _chara->runAction(MoveBy::create(0.5f, Vec2(x, y)));
 
 }
 
@@ -244,27 +253,30 @@ void GameLayer::CheckChara() {
     auto chara_rect = _chara->getBoundingBox();
     auto charaPos = _chara->getPosition();
     
-    //右壁との衝突
-    auto righe_rect = Rect(winSizeW + 210, 0, 10, winSizeH);
-    if (chara_rect.intersectsRect(righe_rect)){
-        this->MissAnime();
+    //タルとの衝突
+    _boxEnd->setState(Barrel::State::STOP);
+    if (_boxEnd->CheckHitSurface(charaPos)) {
+        this->ClearAnime();
+    }
+    if (_boxEnd->CheckOutSurface(charaPos)) {
+        this->MissAnime2();
     }
 
-    //タルとの衝突
-    auto box_rect = _boxEnd->getBoundingBox();
-    auto box_point = _boxEnd->getPosition();
-    if (box_rect.containsPoint(charaPos)) {
-        this->ClearAnime();
+    //右壁との衝突
+    if (charaPos.x < 0 || charaPos.x > winSizeW || charaPos.y < 0 || charaPos.y > winSizeH) {
+        this->MissAnime();
     }
 }
 
 void GameLayer::ClearAnime() {
     _game_state = GameState::CLEAR;
 
+    CocosDenshion::SimpleAudioEngine::getInstance()->playEffect("se/correct2.mp3");
+
     _score++;
     this->ViewScore();
 
-    //_chara->stopAllActions();
+    _chara->stopAllActions();
     _chara->removeFromParent();
 
     _boxEnd->runAction(
@@ -310,6 +322,51 @@ void GameLayer::MissAnime() {
     );
 }
 
+void GameLayer::MissAnime2() {
+    _game_state = GameState::MISS;
+    _chara->stopAllActions();
+
+    //失敗時のSE
+    CocosDenshion::SimpleAudioEngine::getInstance()->playEffect("se/boyon1.mp3");
+
+    _chara->runAction(
+        Sequence::create(
+            Spawn::create(
+                MoveBy::create(0.2f, Vec2(-500, 0)),
+                RotateBy::create(0.2f, 720),
+                FadeOut::create(0.2f),
+                nullptr
+            ),
+            RemoveSelf::create(),
+            nullptr
+        )
+    );
+
+    //ライフのアニメーション
+    auto tag_name = "life" + std::to_string(_lifeNum);
+    auto life = this->getChildByName(tag_name);
+    life->runAction(
+        Sequence::create(
+            Spawn::create(
+                MoveBy::create(0.2f, Vec2(0, 5)),
+                FadeOut::create(0.2f),
+                nullptr
+            ),
+            CallFunc::create([=]() {
+                _lifeNum--;
+                if (_lifeNum == 0) {
+                    this->GameOverAnime();
+                }
+                else {
+                    _game_state = GameState::PLAYING;
+                }
+            }),
+            RemoveSelf::create(),
+        nullptr
+        )
+    );
+}
+
 void GameLayer::GameOverAnime() {
     _game_state = GameState::GAMEOVER;
 
@@ -323,14 +380,24 @@ void GameLayer::GameOverAnime() {
             nullptr
         )
     );
+
+    auto labelBtnLabel1 = Label::createWithSystemFont("ReStart", "Arial", 48);
+    auto mItem1 = MenuItemLabel::create(labelBtnLabel1, CC_CALLBACK_0(GameLayer::nextSceneCallback, this));
+    mItem1->setPosition(Vec2(winSizeCenterW, winSizeCenterH - 200));
+    mItem1->setAnchorPoint(Point::ZERO);
+    mItem1->setColor(Color3B::BLUE);
+
+    auto menu = Menu::create(mItem1, NULL);
+    menu->setPosition(Point::ZERO);
+    this->addChild(menu, (int)mainZOderList::MENU);
 }
 
 void GameLayer::NextStage() {
     _game_state = GameState::NEXT;
 
-    auto next = Sprite::create("game/box.png");
+    auto next = Barrel::create();
     next->setPosition(Vec2(BOX_NEXT_POS_X, BOX_NEXT_POS_Y));
-    next->setRotation(180);
+    next->setStageType(3);
     this->addChild(next, (int)mainZOderList::BOX);
 
     next->runAction(
@@ -352,13 +419,13 @@ void GameLayer::NextStage() {
         Sequence::create(
             Spawn::create(
                 MoveTo::create(0.2f, Vec2(BOX_START_POS_X, BOX_START_POS_Y)),
-                RotateTo::create(0.2f, 0),
+                RotateTo::create(0.2f, 180),
                 nullptr
             ),
             CallFunc::create([=]() {
                 _boxStart = _boxEnd;
+                _boxStart->setStageType(0);
                 _boxEnd = next;
-                _boxEndTime = 0;
                 _game_state = GameState::PLAYING;
             }),
             nullptr

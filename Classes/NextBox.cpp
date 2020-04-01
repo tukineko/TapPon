@@ -27,29 +27,29 @@ bool NextBox::init()
     _hit_area->setPosition(Vec2(0, 28));
     this->addChild(_hit_area);
 
-    auto out_box = Sprite::create();
-    out_box->setTextureRect(Rect(0, 0, 216, 10));
-    out_box->setColor(Color3B(255, 0, 0));
-    out_box->setOpacity(128);
-    out_box->setAnchorPoint(Point::ZERO);
-    out_box->setPosition(Vec2(0, 10));
-    this->addChild(out_box);
+    _out_box = Sprite::create();
+    _out_box->setTextureRect(Rect(0, 0, 216, 10));
+    _out_box->setColor(Color3B(255, 0, 0));
+    _out_box->setOpacity(128);
+    _out_box->setAnchorPoint(Point::ZERO);
+    _out_box->setPosition(Vec2(0, 10));
+    this->addChild(_out_box);
 
-    auto out_box2 = Sprite::create();
-    out_box2->setTextureRect(Rect(0, 0, 216, 10));
-    out_box2->setColor(Color3B(255, 0, 0));
-    out_box2->setOpacity(128);
-    out_box2->setAnchorPoint(Point::ZERO);
-    out_box2->setPosition(Vec2(0, 166));
-    this->addChild(out_box2);
+    _out_box2 = Sprite::create();
+    _out_box2->setTextureRect(Rect(0, 0, 216, 10));
+    _out_box2->setColor(Color3B(255, 0, 0));
+    _out_box2->setOpacity(128);
+    _out_box2->setAnchorPoint(Point::ZERO);
+    _out_box2->setPosition(Vec2(0, 166));
+    this->addChild(_out_box2);
 
-    auto out_box3 = Sprite::create();
-    out_box3->setTextureRect(Rect(0, 0, 10, 170));
-    out_box3->setColor(Color3B(255, 0, 0));
-    out_box3->setOpacity(128);
-    out_box3->setAnchorPoint(Point::ZERO);
-    out_box3->setPosition(Vec2(220, 10));
-    this->addChild(out_box3);
+    _out_box3 = Sprite::create();
+    _out_box3->setTextureRect(Rect(0, 0, 10, 170));
+    _out_box3->setColor(Color3B(255, 0, 0));
+    _out_box3->setOpacity(128);
+    _out_box3->setAnchorPoint(Point::ZERO);
+    _out_box3->setPosition(Vec2(220, 10));
+    this->addChild(_out_box3);
 
     scheduleUpdate();
 
@@ -57,25 +57,39 @@ bool NextBox::init()
 }
 
 void NextBox::update(float dt) {
-    _nextBoxTime += dt;
 
     if (_state == State::STOP) {
         return;
     }
 
+    _nextBoxTime += dt;
     if (_stageType == 1) {
         this->setPositionY(this->getPositionY() + (cos(PI * 0.5 * _nextBoxTime) * 5));
+        CCLOG("%f", this->getRotation() + (cos(PI * 0.5 * _nextBoxTime) * 1));
+        this->setRotation(this->getRotation() + (cos(PI * 0.5 * _nextBoxTime) * 1));
     }
 }
 
-void NextBox::CheckHitArea(Vec2 p) {
-    
-    auto pos = _hit_area->getPosition();
-    auto parent = this->getParent();
-    auto absolutePoint = parent->convertToWorldSpace(pos);
-    CCLOG("x:%f, y:%f", absolutePoint.x, absolutePoint.y);
-    /*auto r = _hit_area->getBoundingBox();
-    if (r.containsPoint(p)) {
-        CCLOG("hit");
-    }*/
+bool NextBox::CheckHitSurface(Vec2 p) {
+    if (_hit_area->getBoundingBox().containsPoint(convertToNodeSpace(p))) {
+        return true;
+    }
+
+    return false;
+}
+
+bool NextBox::CheckOutSurface(Vec2 p) {
+    if (_out_box->getBoundingBox().containsPoint(convertToNodeSpace(p))) {
+        return true;
+    }
+
+    if (_out_box2->getBoundingBox().containsPoint(convertToNodeSpace(p))) {
+        return true;
+    }
+
+    if (_out_box3->getBoundingBox().containsPoint(convertToNodeSpace(p))) {
+        return true;
+    }
+
+    return false;
 }
